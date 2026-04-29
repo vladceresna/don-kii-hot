@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>KiiLang Web IDE</title>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <div class="toolbar">
+            <div class="logo">KiiLang Web</div>
+            <button id="run-btn">▶ Run Code</button>
+            <button id="clear-btn">Clear Terminal</button>
+        </div>
+
+        <div class="workspace">
+            <!-- Редактор кода -->
+            <div class="editor-pane">
+                <textarea id="code-editor" spellcheck="false">
+// Напиши свой код на KiiLang здесь
+main:
+outln "Hello from KiiLang Web!"
+#= staticVar 10
+-> crate-storage
+runif loopBlock, isLooped
+
+crate-storage:
+outln "I store data!"
+
+loopBlock:
+out "Enter a word: "
+in word
+out "You typed: "
+outln word
+</textarea
+                >
+            </div>
+
+            <!-- Терминал -->
+            <div class="terminal-pane" id="terminal-pane">
+                <div id="terminal-output"></div>
+                <div
+                    class="terminal-input-line"
+                    id="terminal-input-line"
+                    style="display: none"
+                >
+                    <span class="prompt">&gt;</span>
+                    <input type="text" id="terminal-input" autocomplete="off" />
+                </div>
+            </div>
+        </div>
+
+        <script src="script.js"></script>
+    </body>
+</html>
