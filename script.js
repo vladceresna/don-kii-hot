@@ -1,5 +1,145 @@
 /** ==========================================
- *  Терминал и Виртуальная Файловая Система
+ *  IDE UI: Подсветка, Вкладки, Файлы
+ *  ========================================== */
+
+// Создаем "правила подсветки" для языка KiiLang
+CodeMirror.defineSimpleMode("kiilang", {
+  start: [
+    // 1. Строки (как в JS)
+    { regex: /"(?:[^\\]|\\.)*?(?:"|$)/, token: "string" },
+
+    // 2. Ключевые слова / Команды (будут как if/for/return в JS)
+    {
+      regex:
+        /\b(?:out|outln|print|println|in|run|runif|loop|equit|del|import|unimport|reload|at|lastof|len|unload)\b/,
+      token: "keyword",
+    },
+
+    // 3. Булевы значения и спец-константы (как true/false/null в JS)
+    { regex: /\b(?:true|false)\b/, token: "atom" },
+
+    // 4. Числа (как в JS)
+    { regex: /\b\d+(\.\d+)?\b/, token: "number" },
+
+    // 5. Имена блоков (Labels) - сделаем их как определения функций (обычно ярко-синие или желтые)
+    { regex: /[a-zA-Z0-9_-]+(?=:)/, token: "def" },
+    { regex: /:/, token: "punctuation" }, // Двоеточие отдельно
+
+    // 6. Операторы (самая сложная часть)
+    // Мы используем стандартный токен "operator"
+    {
+      regex:
+        /->|=>|<-|#=|==|!=|>=|<=|\+=|-=|\*=|\/=|\[\+\]|\[-\]|-=\]|\.\.|\.|>|<|&&|\|\||[+\-*\/=!|=]/,
+      token: "operator",
+    },
+
+    // 7. Комментарии (как в JS)
+    { regex: /\/\/.*/, token: "comment" },
+
+    // 8. Переменные (все остальное)
+    { regex: /[a-zA-Z_][\w]*/, token: "variable" },
+  ],
+  meta: {
+    lineComment: "//",
+  },
+});
+
+// Виртуальная файловая система
+const VirtualFS = {
+  files: {
+    "main.kii":
+      'main:\nprint "Hello KiiLang!"\na = 10\na -> test\nrun test\n\ntest:\nprint a\nprintln ""\n',
+  },
+  openTabs: ["main.kii"],
+  activeFile: "main.kii",
+};
+
+const editor = CodeMirror(document.getElementById("editor-container"), {
+  theme: "dracula",
+  mode: "kiilang",
+  lineNumbers: true,
+  tabSize: 4,
+  indentWithTabs: false,
+});
+
+editor.on("change", () => {
+  VirtualFS.files[VirtualFS.activeFile] = editor.getValue();
+});
+
+function renderExplorer() {
+  const list = document.getElementById("file-list");
+  list.innerHTML = "";
+  Object.keys(VirtualFS.files).forEach((file) => {
+    let li = document.createElement("li");
+    li.className = file === VirtualFS.activeFile ? "active" : "";
+    li.innerHTML = `<span>${file}</span> <span class="delete-file" title="Удалить" onclick="deleteFile(event, '${file}')">×</span>`;
+    li.onclick = () => openTab(file);
+    list.appendChild(li);
+  });
+}
+
+function renderTabs() {
+  const tabs = document.getElementById("tabs-container");
+  tabs.innerHTML = "";
+  VirtualFS.openTabs.forEach((file) => {
+    let tab = document.createElement("div");
+    tab.className = `tab ${file === VirtualFS.activeFile ? "active" : ""}`;
+    tab.innerHTML = `<span>${file}</span> <span class="tab-close" onclick="closeTab(event, '${file}')">×</span>`;
+    tab.onclick = () => switchToTab(file);
+    tabs.appendChild(tab);
+  });
+}
+
+function openTab(filename) {
+  if (!VirtualFS.openTabs.includes(filename)) VirtualFS.openTabs.push(filename);
+  switchToTab(filename);
+}
+
+function switchToTab(filename) {
+  VirtualFS.activeFile = filename;
+  editor.setValue(VirtualFS.files[filename]);
+  renderExplorer();
+  renderTabs();
+}
+
+function closeTab(e, filename) {
+  e.stopPropagation();
+  VirtualFS.openTabs = VirtualFS.openTabs.filter((f) => f !== filename);
+  if (VirtualFS.activeFile === filename) {
+    if (VirtualFS.openTabs.length > 0) switchToTab(VirtualFS.openTabs[0]);
+    else {
+      VirtualFS.activeFile = null;
+      editor.setValue("");
+      renderExplorer();
+      renderTabs();
+    }
+  } else {
+    renderTabs();
+  }
+}
+
+function deleteFile(e, filename) {
+  e.stopPropagation();
+  if (filename === "main.kii") return alert("main.kii удалять нельзя!");
+  delete VirtualFS.files[filename];
+  closeTab(e, filename);
+  renderExplorer();
+}
+
+document.getElementById("add-file-btn").addEventListener("click", () => {
+  let name = prompt("Имя файла:", "module.kii");
+  if (name && !VirtualFS.files[name]) {
+    VirtualFS.files[name] = "";
+    renderExplorer();
+    openTab(name);
+  }
+});
+
+// Инициализация
+switchToTab("main.kii");
+
+/** ==========================================
+ *  Терминал
  *  ========================================== */
 const Terminal = {
   outputEl: document.getElementById("terminal-output"),
@@ -19,17 +159,17 @@ const Terminal = {
     Terminal.outputEl.textContent = "";
   },
   scrollToBottom: () => {
-    document.getElementById("terminal-pane").scrollTop =
-      document.getElementById("terminal-pane").scrollHeight;
+    document.getElementById("terminal-output").scrollTop =
+      document.getElementById("terminal-output").scrollHeight;
   },
 
-  // Асинхронное ожидание ввода (замена Console.ReadLine)
   readAsync: () => {
     return new Promise((resolve) => {
       Terminal.inputLine.style.display = "flex";
       Terminal.inputEl.value = "";
       Terminal.inputEl.focus();
       Terminal.resolveInput = resolve;
+      Terminal.scrollToBottom();
     });
   },
 };
@@ -37,7 +177,7 @@ const Terminal = {
 Terminal.inputEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && Terminal.resolveInput) {
     const val = Terminal.inputEl.value;
-    Terminal.println(val); // эхо ввода
+    Terminal.println(val);
     Terminal.inputLine.style.display = "none";
     let resolve = Terminal.resolveInput;
     Terminal.resolveInput = null;
@@ -45,23 +185,15 @@ Terminal.inputEl.addEventListener("keydown", (e) => {
   }
 });
 
-const VirtualFS = {
-  files: { "main.kii": "" },
-  read: (name) => VirtualFS.files[name] || null,
-  write: (name, content) => {
-    VirtualFS.files[name] = content;
-  },
-};
-
 /** ==========================================
- *  Языковые структуры (Переменные, Память)
+ *  ДВИЖОК KiiLang
  *  ========================================== */
 const Types = { Int: 0, String: 1, Boolean: 2, List: 3, Null: 4 };
 
 class Variable {
   constructor(content, isStatic = false) {
     this.isStatic = isStatic;
-    if (content instanceof Variable) content = content.Get(); // Unbox
+    if (content instanceof Variable) content = content.Get();
 
     this.content = content;
     if (
@@ -121,12 +253,7 @@ class Ch {
   }
 }
 
-/** ==========================================
- *  Операторы (Переписаны под JS и Async)
- *  ========================================== */
 const OPs = {};
-
-// Вспомогательная функция для регистрации операторов
 function regOp(sign, priority, isBinary, action) {
   OPs[sign] = { priority, isBinary, Do: action };
 }
@@ -306,13 +433,12 @@ regOp("in", 0, false, async (ctx, args) => {
   return "^";
 });
 
-// Управление потоком (Blocks)
+// Управление потоком
 regOp("run", 0, false, async (ctx, args) => {
   if (Executor.Blocks.includes(args[0])) await Executor.Exec(args[0]);
   return "^";
 });
 regOp("runif", 0, true, async (ctx, args) => {
-  // args[0]=cond, args[1]=target
   let cond = Ch.VarExist(ctx.block, args[0]);
   if (Array.isArray(args[1])) {
     if (cond && Executor.Blocks.includes(args[1][1]))
@@ -321,7 +447,7 @@ regOp("runif", 0, true, async (ctx, args) => {
       await Executor.Exec(args[1][0]);
   } else {
     if (!cond && Executor.Blocks.includes(args[1]))
-      await Executor.Exec(args[1]);
+      await Executor.Exec(args[1]); // КАК В C#: ЗАПУСК ЕСЛИ FALSE
   }
   return "^";
 });
@@ -330,24 +456,23 @@ regOp("loop", 0, false, async (ctx, args) => {
   if (!Executor.Blocks.includes(target)) throw new Error("K0004");
   while (true) {
     await Executor.Exec(target);
-    await new Promise((r) => setTimeout(r, 0)); // Важно для браузера!
+    await new Promise((r) => setTimeout(r, 0));
   }
 });
 regOp("equit", 0, false, async (ctx, args) => {
   throw new Error("EXIT");
 });
 
-// Передача данных (-> , => , <-)
+// Передача данных
 regOp("->", 0, true, async (ctx, args) => {
   let targets = Array.isArray(args[1]) ? args[1] : [args[1]];
   let vars = Array.isArray(args[0]) ? args[0] : [args[0]];
   for (let target of targets) {
     if (!Executor.Blocks.includes(target)) continue;
-    for (let v of vars) {
+    for (let v of vars)
       Executor.MemoryOfBlocks[target].variables[v] = new Variable(
         Ch.VarExist(ctx.block, v),
       );
-    }
   }
   return "^";
 });
@@ -358,9 +483,8 @@ regOp("=>", 0, true, async (ctx, args) => {
 });
 regOp("<-", 0, true, async (ctx, args) => {
   let targetBlock = Ch.VarExist(ctx.block, args[1]);
-  if (Executor.Blocks.includes(targetBlock)) {
+  if (Executor.Blocks.includes(targetBlock))
     await OPs["->"].Do({ block: targetBlock }, [args[0], ctx.block]);
-  }
   return "^";
 });
 
@@ -421,8 +545,8 @@ regOp("del", 0, false, async (ctx, args) => {
 });
 regOp("import", 0, false, async (ctx, args) => {
   let file = String(Ch.VarExist(ctx.block, args[0]));
-  let code = VirtualFS.read(file);
-  if (code !== null) {
+  let code = VirtualFS.files[file];
+  if (code !== undefined) {
     let parsed = Parser.Parse(Lexer.Tokenize(KiiBlockFinder.FindIn(code)));
     Executor.Init(parsed);
     Executor.ImportedFiles.add(file);
@@ -437,7 +561,7 @@ regOp(
 );
 
 /** ==========================================
- *  Лексер и Парсер (Чистый Рекурсивный Спуск)
+ *  Лексер и Парсер
  *  ========================================== */
 class KiiBlockFinder {
   static FindIn(code) {
@@ -463,22 +587,20 @@ class Lexer {
       for (let line of blocks[block]) {
         let tokens = line.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
         for (let t of tokens) {
-          if (t.startsWith('"') && t.endsWith('"')) {
+          if (t.startsWith('"') && t.endsWith('"'))
             result[block].push({
               type: "String",
               content: t.slice(1, -1).replace(/\\n/g, "\n"),
             });
-          } else if (t.includes(",") && t !== ",") {
+          else if (t.includes(",") && t !== ",") {
             result[block].push({
               type: "Identifier",
               content: t.replace(/,/g, ""),
             });
             result[block].push({ type: "Operator", content: "," });
-          } else if (OPs[t]) {
+          } else if (OPs[t])
             result[block].push({ type: "Operator", content: t });
-          } else {
-            result[block].push({ type: "Identifier", content: t });
-          }
+          else result[block].push({ type: "Identifier", content: t });
         }
         result[block].push({ type: "EndLine", content: ";" });
       }
@@ -487,7 +609,6 @@ class Lexer {
   }
 }
 
-// AST узлы
 class SingleExpression {
   constructor(val) {
     this.val = val;
@@ -519,67 +640,50 @@ class Parser {
       ast[b] = [];
       let tokens = tokenBlocks[b];
       let pos = 0;
-
-      // Простой алгоритм разбора выражений с учетом приоритета, как в C#
       while (pos < tokens.length) {
         if (tokens[pos].type === "EndLine") {
           pos++;
           continue;
         }
-
         let lineTokens = [];
         while (pos < tokens.length && tokens[pos].type !== "EndLine") {
           lineTokens.push(tokens[pos]);
           pos++;
         }
-
-        if (lineTokens.length > 0) {
-          ast[b].push(Parser.ParseLine(lineTokens));
-        }
+        if (lineTokens.length > 0) ast[b].push(Parser.ParseLine(lineTokens));
       }
     }
     return ast;
   }
-
-  // Рекурсивный парсинг линии (заменяет громоздкий Prioritize из C#)
   static ParseLine(tokens) {
     if (tokens.length === 0) return null;
     if (tokens.length === 1) return new SingleExpression(tokens[0].content);
-
-    // Находим оператор с НАИМЕНЬШИМ приоритетом, он будет корнем
-    let minPriority = 999;
-    let opIndex = -1;
-
+    let minPriority = 999,
+      opIndex = -1;
     for (let i = 0; i < tokens.length; i++) {
       if (tokens[i].type === "Operator") {
         let p = OPs[tokens[i].content].priority;
-        // Идем справа налево для ассоциативности
         if (p <= minPriority) {
           minPriority = p;
           opIndex = i;
         }
       }
     }
-
-    if (opIndex === -1) return new SingleExpression(tokens[0].content); // Fallback
-
-    let op = tokens[opIndex].content;
-    let isBin = OPs[op].isBinary;
-
-    if (isBin) {
-      let left = Parser.ParseLine(tokens.slice(0, opIndex));
-      let right = Parser.ParseLine(tokens.slice(opIndex + 1));
-      return new Expression(op, left || new SingleExpression(""), right);
-    } else {
-      // Унарный оператор может быть слева (out, print) или обрабатывать остаток строки
-      let right = Parser.ParseLine(tokens.slice(opIndex + 1));
-      return new Expression(op, right);
-    }
+    if (opIndex === -1) return new SingleExpression(tokens[0].content);
+    let op = tokens[opIndex].content,
+      isBin = OPs[op].isBinary;
+    if (isBin)
+      return new Expression(
+        op,
+        Parser.ParseLine(tokens.slice(0, opIndex)) || new SingleExpression(""),
+        Parser.ParseLine(tokens.slice(opIndex + 1)),
+      );
+    else return new Expression(op, Parser.ParseLine(tokens.slice(opIndex + 1)));
   }
 }
 
 /** ==========================================
- *  Движок (Executor)
+ *  Executor (Движок)
  *  ========================================== */
 class Executor {
   static Blocks = [];
@@ -605,22 +709,19 @@ class Executor {
 
   static async Exec(block) {
     if (this.Blocks.includes(`pre-${block}`)) await this.Exec(`pre-${block}`);
-
     this.BlocksInUse.add(block);
     let ctx = { block: block };
-
     for (let i = 0; i < this.AllTheBlocks[block].length; i++) {
       try {
         await this.AllTheBlocks[block][i].Do(ctx);
       } catch (ex) {
-        if (ex.message === "EXIT") throw ex; // Нормальный выход (equit)
+        if (ex.message === "EXIT") throw ex;
         Terminal.println(
           `\n[ERROR] ${ex.message || "Unknown error"} at line ${i + 1} of block [${block}]`,
         );
-        throw ex; // Прерываем цепочку
+        throw ex;
       }
     }
-
     if (!block.startsWith("crate-")) this.MemoryOfBlocks[block].Clean();
     this.BlocksInUse.delete(block);
   }
@@ -632,25 +733,18 @@ class Executor {
       } catch (e) {
         if (e.message !== "EXIT") console.error(e);
       }
-    } else {
-      Terminal.println("K0003: No main block found.");
-    }
+    } else Terminal.println("K0003: No main block found.");
   }
 }
 
-/** ==========================================
- *  UI Логика
- *  ========================================== */
+// Запуск
 document
   .getElementById("clear-btn")
   .addEventListener("click", () => Terminal.clear());
-
 document.getElementById("run-btn").addEventListener("click", async () => {
-  const code = document.getElementById("code-editor").value;
   Terminal.clear();
-  VirtualFS.write("main.kii", code);
-
   try {
+    let code = VirtualFS.files["main.kii"] || "";
     let rawTokens = Lexer.Tokenize(KiiBlockFinder.FindIn(code));
     let ast = Parser.Parse(rawTokens);
     Executor.ReInit(ast);
