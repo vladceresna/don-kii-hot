@@ -36,6 +36,7 @@
             <button id="mobile-menu-btn" class="mobile-only">[=]</button>
             <div class="logo">KIILANG OS</div>
             <div class="toolbar-actions">
+                <button id="info-btn" class="info-btn">[INFO]</button>
                 <button id="run-btn" class="run-btn">[▶ RUN MAIN]</button>
                 <button id="clear-btn">[CLEAR TERMINAL]</button>
             </div>
@@ -70,6 +71,40 @@
                             autocomplete="off"
                         />
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Модальное окно с информацией -->
+        <div id="info-modal" class="modal-overlay" style="display: none">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span>SYS_INFO.EXE</span>
+                    <button id="close-modal-btn" class="close-btn">[X]</button>
+                </div>
+                <div class="modal-body">
+                    <h2 class="neon-title">KIILANG OS v1.0</h2>
+                    <p>
+                        By
+                        <a
+                            href="https://onlito.link/enR35c"
+                            style="color: #ffb86c"
+                            >Vlad Ceresna</a
+                        >
+                    </p>
+                    <p>
+                        WEB-BASED EXECUTION ENVIRONMENT FOR THE KIILANG
+                        PROGRAMMING LANGUAGE.
+                    </p>
+                    <br />
+                    <p>> 100% C# SPEC COMPATIBLE</p>
+                    <p>> ASYNCHRONOUS I/O TERMINAL</p>
+                    <p>> VIRTUAL FILE SYSTEM</p>
+                    <br />
+                    <p style="color: #ffb86c">CREATED FOR RETRO CODING.</p>
+
+                    <br />
+                    <p class="prompt">_HACK THE PLANET.</p>
                 </div>
             </div>
         </div>

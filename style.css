@@ -399,3 +399,99 @@ button:active {
         font-size: 18px;
     }
 }
+
+/* ==========================================================================
+   МОДАЛЬНОЕ ОКНО (SYS INFO)
+   ========================================================================== */
+.info-btn {
+    color: #f1fa8c;
+    border-color: #f1fa8c;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(18, 4, 36, 0.85); /* Полупрозрачный фон */
+    z-index: 100; /* Поверх UI, но под CRT */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: var(--bg-dark);
+    border: 4px solid var(--accent-pink);
+    box-shadow: 10px 10px 0px var(--bg-panel);
+    width: 90%;
+    max-width: 500px;
+    display: flex;
+    flex-direction: column;
+    animation: popup 0.2s ease-out;
+}
+
+@keyframes popup {
+    0% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    background-color: var(--accent-pink);
+    color: #fff;
+    padding: 10px;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-shadow: 1px 1px 0px #000;
+}
+
+.close-btn {
+    background: transparent;
+    border: none;
+    color: #fff;
+    box-shadow: none;
+    padding: 0;
+    font-size: 14px;
+}
+.close-btn:active {
+    transform: none;
+    box-shadow: none;
+    color: var(--bg-dark);
+}
+
+.modal-body {
+    padding: 20px;
+    font-family: "VT323", monospace;
+    font-size: 22px;
+    text-transform: none;
+    color: var(--text-main);
+    line-height: 1.4;
+}
+
+.neon-title {
+    font-family: "Press Start 2P", cursive;
+    font-size: 14px;
+    color: var(--accent-cyan);
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    text-shadow: 2px 2px 0px var(--bg-panel);
+}
+
+/* Фикс для мобилок */
+@media (max-width: 768px) {
+    .modal-body {
+        font-size: 18px;
+    }
+    .neon-title {
+        font-size: 12px;
+    }
+}

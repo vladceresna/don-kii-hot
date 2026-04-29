@@ -886,3 +886,25 @@ document.getElementById("run-btn").addEventListener("click", async () => {
     Terminal.println("\n[Fatal Execution Error]");
   }
 });
+
+// --- ЛОГИКА МОДАЛЬНОГО ОКНА INFO --- //
+const infoBtn = document.getElementById("info-btn");
+const infoModal = document.getElementById("info-modal");
+const closeModalBtn = document.getElementById("close-modal-btn");
+
+// Открыть окно
+infoBtn.addEventListener("click", () => {
+  infoModal.style.display = "flex";
+});
+
+// Закрыть по кнопке [X]
+closeModalBtn.addEventListener("click", () => {
+  infoModal.style.display = "none";
+});
+
+// Закрыть по клику на темный фон вокруг окна
+window.addEventListener("click", (e) => {
+  if (e.target === infoModal) {
+    infoModal.style.display = "none";
+  }
+});
