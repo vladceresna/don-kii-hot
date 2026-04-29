@@ -1,54 +1,34 @@
 /** ==========================================
- *  IDE UI: Подсветка, Вкладки, Файлы
+ *  IDE UI & SYNTAX HIGHLIGHTING
  *  ========================================== */
 
-// Создаем "правила подсветки" для языка KiiLang
 CodeMirror.defineSimpleMode("kiilang", {
   start: [
-    // 1. Строки (как в JS)
     { regex: /"(?:[^\\]|\\.)*?(?:"|$)/, token: "string" },
-
-    // 2. Ключевые слова / Команды (будут как if/for/return в JS)
     {
       regex:
         /\b(?:out|outln|print|println|in|run|runif|loop|equit|del|import|unimport|reload|at|lastof|len|unload)\b/,
       token: "keyword",
     },
-
-    // 3. Булевы значения и спец-константы (как true/false/null в JS)
     { regex: /\b(?:true|false)\b/, token: "atom" },
-
-    // 4. Числа (как в JS)
     { regex: /\b\d+(\.\d+)?\b/, token: "number" },
-
-    // 5. Имена блоков (Labels) - сделаем их как определения функций (обычно ярко-синие или желтые)
     { regex: /[a-zA-Z0-9_-]+(?=:)/, token: "def" },
-    { regex: /:/, token: "punctuation" }, // Двоеточие отдельно
-
-    // 6. Операторы (самая сложная часть)
-    // Мы используем стандартный токен "operator"
+    { regex: /:/, token: "punctuation" },
     {
       regex:
         /->|=>|<-|#=|==|!=|>=|<=|\+=|-=|\*=|\/=|\[\+\]|\[-\]|-=\]|\.\.|\.|>|<|&&|\|\||[+\-*\/=!|=]/,
       token: "operator",
     },
-
-    // 7. Комментарии (как в JS)
     { regex: /\/\/.*/, token: "comment" },
-
-    // 8. Переменные (все остальное)
     { regex: /[a-zA-Z_][\w]*/, token: "variable" },
   ],
-  meta: {
-    lineComment: "//",
-  },
+  meta: { lineComment: "//" },
 });
 
-// Виртуальная файловая система
 const VirtualFS = {
   files: {
     "main.kii":
-      'main:\nprint "Hello KiiLang!"\na = 10\na -> test\nrun test\n\ntest:\nprint a\nprintln ""\n',
+      'main:\nprint 2 + 3 - 5 * 7 / 2 + 3 * a = 10\nprintln ""\nprintln a',
   },
   openTabs: ["main.kii"],
   activeFile: "main.kii",
@@ -72,7 +52,7 @@ function renderExplorer() {
   Object.keys(VirtualFS.files).forEach((file) => {
     let li = document.createElement("li");
     li.className = file === VirtualFS.activeFile ? "active" : "";
-    li.innerHTML = `<span>${file}</span> <span class="delete-file" title="Удалить" onclick="deleteFile(event, '${file}')">×</span>`;
+    li.innerHTML = `<span>${file}</span> <span class="delete-file" title="Delete" onclick="deleteFile(event, '${file}')">×</span>`;
     li.onclick = () => openTab(file);
     list.appendChild(li);
   });
@@ -113,21 +93,19 @@ function closeTab(e, filename) {
       renderExplorer();
       renderTabs();
     }
-  } else {
-    renderTabs();
-  }
+  } else renderTabs();
 }
 
 function deleteFile(e, filename) {
   e.stopPropagation();
-  if (filename === "main.kii") return alert("main.kii удалять нельзя!");
+  if (filename === "main.kii") return alert("main.kii cannot be deleted!");
   delete VirtualFS.files[filename];
   closeTab(e, filename);
   renderExplorer();
 }
 
 document.getElementById("add-file-btn").addEventListener("click", () => {
-  let name = prompt("Имя файла:", "module.kii");
+  let name = prompt("File name:", "module.kii");
   if (name && !VirtualFS.files[name]) {
     VirtualFS.files[name] = "";
     renderExplorer();
@@ -135,18 +113,13 @@ document.getElementById("add-file-btn").addEventListener("click", () => {
   }
 });
 
-// Инициализация
 switchToTab("main.kii");
 
-/** ==========================================
- *  Терминал
- *  ========================================== */
 const Terminal = {
   outputEl: document.getElementById("terminal-output"),
   inputLine: document.getElementById("terminal-input-line"),
   inputEl: document.getElementById("terminal-input"),
   resolveInput: null,
-
   print: (text) => {
     Terminal.outputEl.textContent += text;
     Terminal.scrollToBottom();
@@ -159,10 +132,9 @@ const Terminal = {
     Terminal.outputEl.textContent = "";
   },
   scrollToBottom: () => {
-    document.getElementById("terminal-output").scrollTop =
-      document.getElementById("terminal-output").scrollHeight;
+    document.getElementById("terminal-pane").scrollTop =
+      document.getElementById("terminal-pane").scrollHeight;
   },
-
   readAsync: () => {
     return new Promise((resolve) => {
       Terminal.inputLine.style.display = "flex";
@@ -186,15 +158,18 @@ Terminal.inputEl.addEventListener("keydown", (e) => {
 });
 
 /** ==========================================
- *  ДВИЖОК KiiLang
+ *  KIILANG ENGINE (100% C# PORT)
  *  ========================================== */
+
+const ParserHelper = {
+  ops: { "=": true, "-": true, len: false, "==": true, runif: true },
+};
 const Types = { Int: 0, String: 1, Boolean: 2, List: 3, Null: 4 };
 
 class Variable {
   constructor(content, isStatic = false) {
     this.isStatic = isStatic;
     if (content instanceof Variable) content = content.Get();
-
     this.content = content;
     if (
       typeof content === "boolean" ||
@@ -233,9 +208,8 @@ class Memory {
     this.variables = {};
   }
   Clean() {
-    for (let key in this.variables) {
+    for (let key in this.variables)
       if (!this.variables[key].isStatic) delete this.variables[key];
-    }
   }
 }
 
@@ -244,9 +218,8 @@ class Ch {
     if (
       typeof name === "string" &&
       Executor.MemoryOfBlocks[block]?.variables[name]
-    ) {
+    )
       return Executor.MemoryOfBlocks[block].variables[name].Get();
-    }
     if (name === "true") return true;
     if (name === "false") return false;
     return name;
@@ -255,20 +228,24 @@ class Ch {
 
 const OPs = {};
 function regOp(sign, priority, isBinary, action) {
-  OPs[sign] = { priority, isBinary, Do: action };
+  OPs[sign] = { sign, priority, isBinary, Do: action };
 }
 
-// Математика
-regOp("*", 5, true, async (ctx, args) =>
-  args.reduce((acc, y) => acc * parseInt(Ch.VarExist(ctx.block, y)), 1),
-);
-regOp(
-  "/",
-  5,
-  true,
-  async (ctx, args) =>
-    parseInt(Ch.VarExist(ctx.block, args[0])) /
-    parseInt(Ch.VarExist(ctx.block, args[1])),
+// Utils to simulate C# Convert.ToInt32 throwing K0002
+function getInt(ctx, arg) {
+  let v = parseInt(Ch.VarExist(ctx.block, arg));
+  if (isNaN(v)) throw new Error("K0002");
+  return v;
+}
+
+// Math Operators (Strict C# throwing behavior)
+regOp("*", 5, true, async (ctx, args) => {
+  let x = 1;
+  for (let y of args) x *= getInt(ctx, y);
+  return x;
+});
+regOp("/", 5, true, async (ctx, args) =>
+  Math.floor(getInt(ctx, args[0]) / getInt(ctx, args[1])),
 );
 regOp(
   "|",
@@ -280,12 +257,9 @@ regOp(
 );
 regOp("+", 4, true, async (ctx, args) => {
   try {
-    let isStr = args.some((y) => isNaN(Ch.VarExist(ctx.block, y)));
-    if (isStr) return args.map((y) => Ch.VarExist(ctx.block, y)).join("");
-    return args.reduce(
-      (acc, y) => acc + parseInt(Ch.VarExist(ctx.block, y)),
-      0,
-    );
+    let x = 0;
+    for (let y of args) x += getInt(ctx, y);
+    return x;
   } catch {
     return args.map((y) => Ch.VarExist(ctx.block, y)).join("");
   }
@@ -294,12 +268,10 @@ regOp(
   "-",
   4,
   true,
-  async (ctx, args) =>
-    parseInt(Ch.VarExist(ctx.block, args[0])) -
-    parseInt(Ch.VarExist(ctx.block, args[1])),
+  async (ctx, args) => getInt(ctx, args[0]) - getInt(ctx, args[1]),
 );
 
-// Логика и сравнение
+// Logic & Assign
 regOp(
   "!",
   3,
@@ -310,33 +282,25 @@ regOp(
   ">",
   3,
   true,
-  async (ctx, args) =>
-    parseInt(Ch.VarExist(ctx.block, args[0])) >
-    parseInt(Ch.VarExist(ctx.block, args[1])),
+  async (ctx, args) => getInt(ctx, args[0]) > getInt(ctx, args[1]),
 );
 regOp(
   "<",
   3,
   true,
-  async (ctx, args) =>
-    parseInt(Ch.VarExist(ctx.block, args[0])) <
-    parseInt(Ch.VarExist(ctx.block, args[1])),
+  async (ctx, args) => getInt(ctx, args[0]) < getInt(ctx, args[1]),
 );
 regOp(
   ">=",
   3,
   true,
-  async (ctx, args) =>
-    parseInt(Ch.VarExist(ctx.block, args[0])) >=
-    parseInt(Ch.VarExist(ctx.block, args[1])),
+  async (ctx, args) => getInt(ctx, args[0]) >= getInt(ctx, args[1]),
 );
 regOp(
   "<=",
   3,
   true,
-  async (ctx, args) =>
-    parseInt(Ch.VarExist(ctx.block, args[0])) <=
-    parseInt(Ch.VarExist(ctx.block, args[1])),
+  async (ctx, args) => getInt(ctx, args[0]) <= getInt(ctx, args[1]),
 );
 regOp(
   "==",
@@ -371,10 +335,11 @@ regOp(
     Boolean(Ch.VarExist(ctx.block, args[1])),
 );
 
-// Присваивание
 regOp("=", 0, true, async (ctx, args) => {
   let val = Ch.VarExist(ctx.block, args[1]);
-  Executor.MemoryOfBlocks[ctx.block].variables[args[0]] = new Variable(val);
+  Executor.MemoryOfBlocks[ctx.block].variables[String(args[0])] = new Variable(
+    val,
+  );
   return val;
 });
 regOp("#=", 0, true, async (ctx, args) => {
@@ -395,26 +360,19 @@ regOp("+=", 0, true, async (ctx, args) => {
 });
 regOp("-=", 0, true, async (ctx, args) => {
   let mem = Executor.MemoryOfBlocks[ctx.block].variables;
-  mem[args[0]].Set(
-    parseInt(mem[args[0]].Get()) - parseInt(Ch.VarExist(ctx.block, args[1])),
-  );
+  mem[args[0]].Set(parseInt(mem[args[0]].Get()) - getInt(ctx, args[1]));
 });
 regOp("*=", 0, true, async (ctx, args) => {
   let mem = Executor.MemoryOfBlocks[ctx.block].variables;
-  mem[args[0]].Set(
-    parseInt(mem[args[0]].Get()) * parseInt(Ch.VarExist(ctx.block, args[1])),
-  );
+  mem[args[0]].Set(parseInt(mem[args[0]].Get()) * getInt(ctx, args[1]));
 });
 regOp("/=", 0, true, async (ctx, args) => {
   let mem = Executor.MemoryOfBlocks[ctx.block].variables;
   mem[args[0]].Set(
-    Math.floor(
-      parseInt(mem[args[0]].Get()) / parseInt(Ch.VarExist(ctx.block, args[1])),
-    ),
+    Math.floor(parseInt(mem[args[0]].Get()) / getInt(ctx, args[1])),
   );
 });
 
-// Вывод и Ввод
 regOp("out", 0, false, async (ctx, args) => {
   let val = Ch.VarExist(ctx.block, args[0]);
   Terminal.print(String(val));
@@ -433,7 +391,6 @@ regOp("in", 0, false, async (ctx, args) => {
   return "^";
 });
 
-// Управление потоком
 regOp("run", 0, false, async (ctx, args) => {
   if (Executor.Blocks.includes(args[0])) await Executor.Exec(args[0]);
   return "^";
@@ -447,7 +404,7 @@ regOp("runif", 0, true, async (ctx, args) => {
       await Executor.Exec(args[1][0]);
   } else {
     if (!cond && Executor.Blocks.includes(args[1]))
-      await Executor.Exec(args[1]); // КАК В C#: ЗАПУСК ЕСЛИ FALSE
+      await Executor.Exec(args[1]);
   }
   return "^";
 });
@@ -463,7 +420,6 @@ regOp("equit", 0, false, async (ctx, args) => {
   throw new Error("EXIT");
 });
 
-// Передача данных
 regOp("->", 0, true, async (ctx, args) => {
   let targets = Array.isArray(args[1]) ? args[1] : [args[1]];
   let vars = Array.isArray(args[0]) ? args[0] : [args[0]];
@@ -488,7 +444,6 @@ regOp("<-", 0, true, async (ctx, args) => {
   return "^";
 });
 
-// Списки
 regOp(",", 1, true, async (ctx, args) => {
   let lst = [args[0]];
   if (Array.isArray(args[1])) lst.push(...args[1]);
@@ -496,8 +451,8 @@ regOp(",", 1, true, async (ctx, args) => {
   return lst;
 });
 regOp("..", 15, true, async (ctx, args) => {
-  let start = parseInt(Ch.VarExist(ctx.block, args[0])),
-    end = parseInt(Ch.VarExist(ctx.block, args[1]));
+  let start = getInt(ctx, args[0]),
+    end = getInt(ctx, args[1]);
   let res = [];
   for (let i = start; i <= end; i++) res.push(i);
   return res;
@@ -510,8 +465,7 @@ regOp(
   "at",
   5,
   true,
-  async (ctx, args) =>
-    Ch.VarExist(ctx.block, args[1])[parseInt(Ch.VarExist(ctx.block, args[0]))],
+  async (ctx, args) => Ch.VarExist(ctx.block, args[1])[getInt(ctx, args[0])],
 );
 regOp("lastof", 5, false, async (ctx, args) => {
   let list = Ch.VarExist(ctx.block, args[0]);
@@ -533,12 +487,11 @@ regOp("[-]", 0, true, async (ctx, args) => {
 });
 regOp("-=]", 0, true, async (ctx, args) => {
   let list = Ch.VarExist(ctx.block, args[1]);
-  list.splice(parseInt(Ch.VarExist(ctx.block, args[0])), 1);
+  list.splice(getInt(ctx, args[0]), 1);
   Executor.MemoryOfBlocks[ctx.block].variables[args[1]] = new Variable(list);
   return "^";
 });
 
-// Утилиты
 regOp("del", 0, false, async (ctx, args) => {
   let vars = Array.isArray(args[0]) ? args[0] : [args[0]];
   for (let v of vars) delete Executor.MemoryOfBlocks[ctx.block].variables[v];
@@ -547,7 +500,11 @@ regOp("import", 0, false, async (ctx, args) => {
   let file = String(Ch.VarExist(ctx.block, args[0]));
   let code = VirtualFS.files[file];
   if (code !== undefined) {
-    let parsed = Parser.Parse(Lexer.Tokenize(KiiBlockFinder.FindIn(code)));
+    let parsed = Parser.Prioritize(
+      Parser.Parse(
+        Lexer.Tokenize2(Lexer.RawTokenize(KiiBlockFinder.FindIn(code))),
+      ),
+    );
     Executor.Init(parsed);
     Executor.ImportedFiles.add(file);
   } else throw new Error("K0005");
@@ -560,9 +517,6 @@ regOp(
     `${Ch.VarExist(ctx.block, args[0])} ${Ch.VarExist(ctx.block, args[1])}`,
 );
 
-/** ==========================================
- *  Лексер и Парсер
- *  ========================================== */
 class KiiBlockFinder {
   static FindIn(code) {
     let result = { main: [] };
@@ -580,29 +534,96 @@ class KiiBlockFinder {
 }
 
 class Lexer {
-  static Tokenize(blocks) {
+  static RawTokenize(blocks) {
     let result = {};
-    for (let block in blocks) {
-      result[block] = [];
-      for (let line of blocks[block]) {
-        let tokens = line.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
-        for (let t of tokens) {
-          if (t.startsWith('"') && t.endsWith('"'))
-            result[block].push({
-              type: "String",
-              content: t.slice(1, -1).replace(/\\n/g, "\n"),
-            });
-          else if (t.includes(",") && t !== ",") {
-            result[block].push({
-              type: "Identifier",
-              content: t.replace(/,/g, ""),
-            });
-            result[block].push({ type: "Operator", content: "," });
-          } else if (OPs[t])
-            result[block].push({ type: "Operator", content: t });
-          else result[block].push({ type: "Identifier", content: t });
+    for (let key in blocks) {
+      result[key] = [];
+      for (let line of blocks[key]) {
+        let contents = "",
+          writingString = false;
+        for (let i = 0; i < line.length; i++) {
+          let symbol = line[i];
+          if (symbol === '"') {
+            if (writingString) {
+              if (line[i - 1] !== "\\") {
+                writingString = !writingString;
+                result[key].push({
+                  content: contents.replace(/\\n/g, "\n"),
+                  type: "String",
+                });
+                contents = "";
+              } else contents += '"';
+            } else writingString = true;
+          } else if (symbol === " ") {
+            if (!writingString) {
+              if (contents.trim() !== "") {
+                result[key].push({ content: contents, type: "Identifier" });
+                contents = "";
+              }
+            } else contents += " ";
+          } else if (symbol === ".") {
+            if (!writingString) {
+              if (contents.trim() !== "") {
+                result[key].push({ content: contents, type: "Identifier" });
+                contents = "";
+              }
+              result[key].push({ content: ".", type: "Operator" });
+            } else contents += ".";
+          } else contents += symbol;
         }
-        result[block].push({ type: "EndLine", content: ";" });
+        if (contents !== "" && contents !== "\0" && contents !== "\r") {
+          if (!writingString)
+            result[key].push({ content: contents, type: "Identifier" });
+          else
+            result[key].push({
+              content: contents.replace(/\\n/g, "\n"),
+              type: "String",
+            });
+        }
+        result[key].push({ content: ";", type: "EndLine" });
+      }
+    }
+    return result;
+  }
+  static Tokenize2(raw) {
+    let result = {};
+    for (let key in raw) {
+      result[key] = [];
+      for (let token of raw[key]) {
+        let newToken = { ...token };
+        if (OPs[newToken.content] && newToken.type !== "String")
+          newToken.type = "Operator";
+        else {
+          let isBlockReference = Object.keys(raw).some((x) =>
+            newToken.content.includes(x),
+          );
+          if (isBlockReference) newToken.type = "BlockReference";
+        }
+        if (!isNaN(newToken.content) && newToken.content.trim() !== "")
+          newToken.type = "Integer";
+
+        if (newToken.content.includes(",") && newToken.type !== "String") {
+          newToken.content = newToken.content.replace(/,/g, "");
+          result[key].push(newToken);
+          result[key].push({ content: ",", type: "Operator" });
+        } else if (
+          newToken.content.includes("..") &&
+          newToken.type !== "String" &&
+          newToken.type !== "Operator"
+        ) {
+          newToken.content = newToken.content.replace(/\.\./g, " ");
+          let split = newToken.content.split(" ").filter(Boolean);
+          if (split.length === 2) {
+            result[key].push({ content: split[0], type: "Identifier" });
+            result[key].push({ content: "..", type: "Operator" });
+            result[key].push({ content: split[1], type: "Identifier" });
+          } else {
+            result[key].push(newToken);
+            result[key].push({ content: "..", type: "Operator" });
+          }
+        } else {
+          if (newToken.content !== "") result[key].push(newToken);
+        }
       }
     }
     return result;
@@ -618,73 +639,166 @@ class SingleExpression {
   }
 }
 class Expression {
-  constructor(op, one, two = null) {
-    this.op = op;
+  constructor(one, two, op) {
     this.one = one;
     this.two = two;
+    this.op = op;
   }
   async Do(ctx) {
-    if (this.two)
-      return await OPs[this.op].Do(ctx, [
+    try {
+      return await this.op.Do(ctx, [
         await this.one.Do(ctx),
         await this.two.Do(ctx),
       ]);
-    return await OPs[this.op].Do(ctx, [await this.one.Do(ctx)]);
+    } catch (ex) {
+      return await this.op.Do(ctx, [await this.one.Do(ctx)]);
+    }
   }
 }
 
 class Parser {
-  static Parse(tokenBlocks) {
-    let ast = {};
-    for (let b in tokenBlocks) {
-      ast[b] = [];
-      let tokens = tokenBlocks[b];
-      let pos = 0;
-      while (pos < tokens.length) {
-        if (tokens[pos].type === "EndLine") {
-          pos++;
-          continue;
-        }
-        let lineTokens = [];
-        while (pos < tokens.length && tokens[pos].type !== "EndLine") {
-          lineTokens.push(tokens[pos]);
-          pos++;
-        }
-        if (lineTokens.length > 0) ast[b].push(Parser.ParseLine(lineTokens));
+  static Prioritize(box) {
+    let result = {};
+    for (let key in box) {
+      result[key] = [];
+      for (let item of box[key]) {
+        if (item.one instanceof Expression) {
+          if (item.op.priority === 0)
+            result[key].push(
+              new Expression(Parser.Pri(item.one), item.two, item.op),
+            );
+          else {
+            let _new = Parser.Pri(item),
+              limit = 0;
+            while (_new.op && _new.op.priority !== 0 && limit++ < 50)
+              _new = Parser.Pri(_new);
+            result[key].push(_new);
+          }
+        } else if (item.two instanceof Expression) {
+          if (item.op.priority === 0)
+            result[key].push(
+              new Expression(item.one, Parser.Pri(item.two), item.op),
+            );
+          else {
+            let _new = Parser.Pri(item),
+              limit = 0;
+            while (_new.op && _new.op.priority !== 0 && limit++ < 50)
+              _new = Parser.Pri(_new);
+            result[key].push(_new);
+          }
+        } else result[key].push(item);
       }
     }
-    return ast;
+    return result;
   }
-  static ParseLine(tokens) {
-    if (tokens.length === 0) return null;
-    if (tokens.length === 1) return new SingleExpression(tokens[0].content);
-    let minPriority = 999,
-      opIndex = -1;
-    for (let i = 0; i < tokens.length; i++) {
-      if (tokens[i].type === "Operator") {
-        let p = OPs[tokens[i].content].priority;
-        if (p <= minPriority) {
-          minPriority = p;
-          opIndex = i;
+
+  static Pri(base) {
+    let newExpr = new Expression(base.one, base.two, base.op);
+    try {
+      if (base.one instanceof Expression) {
+        try {
+          if (base.op.priority > base.one.op.priority) {
+            let smallNode = base.two.one,
+              bigNode = base.two;
+            newExpr.op = bigNode.op;
+            newExpr.one = new Expression(base.one, smallNode, base.op);
+            newExpr.two = bigNode.two;
+          } else if (newExpr.two instanceof Expression)
+            newExpr.two = Parser.Pri(newExpr.two);
+        } catch (ex) {
+          if (base.op.priority > base.one.op.priority) {
+            let smallNode = base.one.one,
+              bigNode = base.one;
+            newExpr.op = bigNode.op;
+            newExpr.one = new Expression(
+              smallNode,
+              new SingleExpression(0),
+              base.op,
+            );
+            newExpr.two = bigNode.two;
+          }
+        }
+      }
+      if (base.two instanceof Expression) {
+        if (base.op.priority > base.two.op.priority) {
+          let smallNode = base.two.one,
+            bigNode = base.two;
+          newExpr.op = bigNode.op;
+          newExpr.one = new Expression(base.one, smallNode, base.op);
+          newExpr.two = bigNode.two;
+        } else if (newExpr.two instanceof Expression)
+          newExpr.two = Parser.Pri(newExpr.two);
+      }
+    } catch (ex) {}
+    return newExpr;
+  }
+
+  static Parse(box) {
+    let result = {};
+    for (let key in box) {
+      result[key] = [];
+      for (let i = 0; i < box[key].length; i++) {
+        if (box[key][i].type !== "EndLine") {
+          if (i + 1 < box[key].length && box[key][i + 1].type !== "EndLine") {
+            let ref = { i };
+            result[key].push(Parser.Expr(ref, box[key]));
+            i = ref.i;
+          }
         }
       }
     }
-    if (opIndex === -1) return new SingleExpression(tokens[0].content);
-    let op = tokens[opIndex].content,
-      isBin = OPs[op].isBinary;
-    if (isBin)
-      return new Expression(
-        op,
-        Parser.ParseLine(tokens.slice(0, opIndex)) || new SingleExpression(""),
-        Parser.ParseLine(tokens.slice(opIndex + 1)),
-      );
-    else return new Expression(op, Parser.ParseLine(tokens.slice(opIndex + 1)));
+    return result;
+  }
+
+  static Expr(ref, box) {
+    let newExpr = new Expression(),
+      i = ref.i;
+    let isBinary =
+      ParserHelper.ops[box[i].content] !== undefined
+        ? ParserHelper.ops[box[i].content]
+        : box[i].type !== "Operator";
+    let ti = i;
+    if (isBinary) {
+      i += 1;
+      newExpr.one = new SingleExpression(box[i - 1].content);
+      try {
+        if (
+          (box[i + 2] && box[i + 2].type === "Operator") ||
+          (box[i + 1] && box[i + 1].type === "Operator")
+        ) {
+          ti = i;
+          i += 1;
+          ref.i = i;
+          newExpr.two = Parser.Expr(ref, box);
+          i = ref.i;
+        } else if (box[i + 2] && box[i + 2].type === "EndLine") {
+          newExpr.two = new SingleExpression(box[i + 1].content);
+          ti = i;
+        }
+      } catch (e) {}
+    } else {
+      try {
+        if (box[i + 2] && box[i + 2].type === "Operator") {
+          ti = i;
+          i += 1;
+          ref.i = i;
+          newExpr.one = Parser.Expr(ref, box);
+          i = ref.i;
+        } else if (box[i + 1] && box[i + 1].type === "Operator") {
+          ti = i;
+          i += 1;
+          ref.i = i;
+          newExpr.one = Parser.Expr(ref, box);
+          i = ref.i;
+        } else newExpr.one = new SingleExpression(box[i + 1].content);
+      } catch (e) {}
+    }
+    newExpr.op = OPs[box[ti].content] || OPs["+"];
+    ref.i = i;
+    return newExpr;
   }
 }
 
-/** ==========================================
- *  Executor (Движок)
- *  ========================================== */
 class Executor {
   static Blocks = [];
   static MemoryOfBlocks = {};
@@ -737,7 +851,6 @@ class Executor {
   }
 }
 
-// Запуск
 document
   .getElementById("clear-btn")
   .addEventListener("click", () => Terminal.clear());
@@ -745,8 +858,9 @@ document.getElementById("run-btn").addEventListener("click", async () => {
   Terminal.clear();
   try {
     let code = VirtualFS.files["main.kii"] || "";
-    let rawTokens = Lexer.Tokenize(KiiBlockFinder.FindIn(code));
-    let ast = Parser.Parse(rawTokens);
+    let rawTokens = Lexer.RawTokenize(KiiBlockFinder.FindIn(code));
+    let tokens2 = Lexer.Tokenize2(rawTokens);
+    let ast = Parser.Prioritize(Parser.Parse(tokens2));
     Executor.ReInit(ast);
     await Executor.Launch();
     Terminal.println("\n[Program finished]");
