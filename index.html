@@ -1,36 +1,43 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>KiiLang Studio</title>
-        <link rel="stylesheet" href="style.css" />
+        <title>KiiLang Retro Studio</title>
 
-        <!-- CodeMirror для редактора с подсветкой -->
+        <!-- Пиксельные шрифты -->
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap"
+            rel="stylesheet"
+        />
+
+        <!-- CodeMirror ядро -->
         <link
             rel="stylesheet"
             href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css"
         />
-        <link
-            rel="stylesheet"
-            href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css"
-        />
-
         <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/mode/simple.min.js"></script>
+
+        <link rel="stylesheet" href="style.css" />
     </head>
     <body>
+        <!-- CRT эффект старого экрана -->
+        <div class="crt-overlay"></div>
+
         <div class="toolbar">
-            <div class="logo">KiiLang Studio</div>
-            <button id="add-file-btn">+ New File</button>
-            <button id="run-btn" class="run-btn">▶ Run (main.kii)</button>
-            <button id="clear-btn">Clear Terminal</button>
+            <div class="logo">KIILANG OS</div>
+            <button id="add-file-btn">[+ NEW FILE]</button>
+            <button id="run-btn" class="run-btn">[▶ RUN MAIN]</button>
+            <button id="clear-btn">[CLEAR TERMINAL]</button>
         </div>
 
         <div class="main-container">
             <!-- Левое меню (Explorer) -->
             <div class="sidebar">
-                <div class="sidebar-title">EXPLORER</div>
+                <div class="sidebar-title">DATA_DRIVES</div>
                 <ul id="file-list"></ul>
             </div>
 
@@ -43,7 +50,7 @@
 
                 <!-- Терминал -->
                 <div class="terminal-pane" id="terminal-pane">
-                    <div class="terminal-header">TERMINAL</div>
+                    <div class="terminal-header">SYS_TERMINAL</div>
                     <div id="terminal-output"></div>
                     <div
                         class="terminal-input-line"

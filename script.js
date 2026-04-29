@@ -35,7 +35,7 @@ const VirtualFS = {
 };
 
 const editor = CodeMirror(document.getElementById("editor-container"), {
-  theme: "dracula",
+  theme: "retro-purple",
   mode: "kiilang",
   lineNumbers: true,
   tabSize: 4,
