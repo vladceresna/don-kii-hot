@@ -1,3 +1,21 @@
+// --- ДОБАВЬ ЭТО В КОНЕЦ script.js ДЛЯ РАБОТЫ МОБИЛЬНОГО МЕНЮ --- //
+
+document.getElementById("mobile-menu-btn").addEventListener("click", () => {
+  const sidebar = document.getElementById("sidebar");
+  sidebar.classList.toggle("open");
+});
+
+// Закрывать меню при клике по файлу на телефоне
+function openTab(filename) {
+  if (!VirtualFS.openTabs.includes(filename)) VirtualFS.openTabs.push(filename);
+  switchToTab(filename);
+
+  // Прячем сайдбар на мобилках после выбора файла
+  if (window.innerWidth <= 768) {
+    document.getElementById("sidebar").classList.remove("open");
+  }
+}
+
 /** ==========================================
  *  IDE UI & SYNTAX HIGHLIGHTING
  *  ========================================== */
